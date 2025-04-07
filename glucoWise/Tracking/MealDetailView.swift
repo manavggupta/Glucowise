@@ -49,10 +49,10 @@ struct MealDetailView: View {
                             }
                             
                             Section(header: Text("Macronutrient Breakdown")) {
-                                NutrientBarView(nutrient: "Carbs", value: Int(nutrients.carbs), maxValue: 105, color: .green)
-                                NutrientBarView(nutrient: "Protein", value: Int(nutrients.proteins), maxValue: 25, color: .yellow)
-                                NutrientBarView(nutrient: "Fats", value: Int(nutrients.fats), maxValue: 21, color: .red)
-                                NutrientBarView(nutrient: "Fiber", value: Int(nutrients.fiber), maxValue: 10, color: .green)
+                                NutrientRows(name: "Carbs", current: Int(nutrients.carbs), mealType: mealType)
+                                NutrientRows(name: "Protein", current: Int(nutrients.proteins), mealType: mealType)
+                                NutrientRows(name: "Fats", current: Int(nutrients.fats), mealType: mealType)
+                                NutrientRows(name: "Fiber", current: Int(nutrients.fiber), mealType: mealType)
                             }
                         }
                     }
@@ -108,23 +108,61 @@ struct GlycemicIndicatorView: View {
     }
 }
 
-struct NutrientBarView: View {
-    var nutrient: String
-    var value: Int
-    var maxValue: Int
-    var color: Color
+struct NutrientRows: View {
+    let name: String
+    let current: Int
+    let mealType: String
+    @AppStorage("currentUserId") var userId: String = ""
+    
+    var total: Int {
+        if let goals = UserManager.shared.getMacronutrientGoals(for: userId) {
+            let mealPercentage: Double
+            switch mealType {
+            case "Breakfast":
+                mealPercentage = 0.25
+            case "Lunch":
+                mealPercentage = 0.35
+            case "Snacks":
+                mealPercentage = 0.15
+            case "Dinner":
+                mealPercentage = 0.25
+            default:
+                mealPercentage = 0.0
+            }
+            
+            switch name {
+            case "Carbs":
+                return Int(goals.carbs * mealPercentage)
+            case "Protein":
+                return Int(goals.protein * mealPercentage)
+            case "Fats":
+                return Int(goals.fats * mealPercentage)
+            case "Fiber":
+                return Int(goals.fiber * mealPercentage)
+            default:
+                return 0
+            }
+        }
+        return 0
+    }
+    
+    var color: Color {
+        let ratio = Double(current) / Double(total)
+        if ratio > 1.0 { return .red }
+        else if ratio >= 0.8 { return .green }
+        else { return .orange }
+    }
     
     var body: some View {
-        VStack{
-            HStack{
-                Text(nutrient).font(.subheadline)
-                Spacer()
-                Text("\(value)/\(maxValue)").font(.caption).foregroundColor(.gray)
-            }
-            HStack{
-                Spacer()
-                ProgressView(value: Double(value), total: Double(maxValue))
-                .accentColor(color).frame(width: 120, height: 10)}
+        HStack {
+            Text(name)
+            Spacer()
+            Text("\(current)/\(total) g")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+            ProgressView(value: Double(current), total: Double(total))
+                .progressViewStyle(LinearProgressViewStyle(tint: color))
+                .frame(width: 100)
         }
     }
 }

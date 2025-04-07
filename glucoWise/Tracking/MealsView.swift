@@ -91,10 +91,10 @@ struct MealsView: View {
                     
                     
                     Section(header: Text("Macronutrient Breakdown").foregroundColor(.gray)) {
-                        NutrientRow(name: "Carbs", current: Int(userManager.getCarbsForDay(userID: userId, date: selectedDate)), total: 150)
-                        NutrientRow(name: "Protein", current: Int(userManager.getProteinForDay(userID: userId, date: selectedDate)), total: 25)
-                        NutrientRow(name: "Fats", current: Int(userManager.getFatForDay(userID: userId, date: selectedDate)), total: 21)
-                        NutrientRow(name: "Fiber", current: Int(userManager.getFiberForDay(userID: userId, date: selectedDate)), total: 10)
+                        NutrientRow(name: "Carbs", current: Int(userManager.getCarbsForDay(userID: userId, date: selectedDate)))
+                        NutrientRow(name: "Protein", current: Int(userManager.getProteinForDay(userID: userId, date: selectedDate)))
+                        NutrientRow(name: "Fats", current: Int(userManager.getFatForDay(userID: userId, date: selectedDate)))
+                        NutrientRow(name: "Fiber", current: Int(userManager.getFiberForDay(userID: userId, date: selectedDate)))
 
                     }
                 }
@@ -129,7 +129,25 @@ struct MealsView: View {
 struct NutrientRow: View {
     let name: String
     let current: Int
-    let total: Int
+    @AppStorage("currentUserId") var userId: String = ""
+    
+    var total: Int {
+        if let goals = UserManager.shared.getMacronutrientGoals(for: userId) {
+            switch name {
+            case "Carbs":
+                return Int(goals.carbs)
+            case "Protein":
+                return Int(goals.protein)
+            case "Fats":
+                return Int(goals.fats)
+            case "Fiber":
+                return Int(goals.fiber)
+            default:
+                return 0
+            }
+        }
+        return 0
+    }
     
     var color: Color {
         let ratio = Double(current) / Double(total)
@@ -149,6 +167,41 @@ struct NutrientRow: View {
                 .progressViewStyle(LinearProgressViewStyle(tint: color))
                 .frame(width: 100)
         }
+    }
+}
+
+struct MacronutrientBreakdown: View {
+    @AppStorage("currentUserId") var userId: String = ""
+    let meals: [Meal]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Macronutrient Breakdown")
+                .font(.headline)
+            
+            if let goals = UserManager.shared.getMacronutrientGoals(for: userId) {
+                let totalNutrition = meals.reduce((carbs: 0.0, proteins: 0.0, fats: 0.0, fiber: 0.0)) { result, meal in
+                    let nutrition = meal.totalNutrition
+                    return (
+                        carbs: result.carbs + nutrition.carbs,
+                        proteins: result.proteins + nutrition.proteins,
+                        fats: result.fats + nutrition.fats,
+                        fiber: result.fiber + nutrition.fiber
+                    )
+                }
+                
+                NutrientRow(name: "Carbs", current: Int(totalNutrition.carbs))
+                NutrientRow(name: "Protein", current: Int(totalNutrition.proteins))
+                NutrientRow(name: "Fats", current: Int(totalNutrition.fats))
+                NutrientRow(name: "Fiber", current: Int(totalNutrition.fiber))
+            } else {
+                Text("Unable to calculate macronutrient goals")
+                    .foregroundColor(.gray)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
     }
 }
 

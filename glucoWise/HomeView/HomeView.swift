@@ -236,7 +236,7 @@ struct BloodGlucoseSection: View {
         }
     }
     
-import SwiftUI
+
 
 struct MealRecommendationSection: View {
     var selectedDate: Date

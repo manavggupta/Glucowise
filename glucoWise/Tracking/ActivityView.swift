@@ -1,44 +1,52 @@
 import SwiftUI
 import Charts
+import HealthKit
 
 struct HealthStatsView: View {
     @State private var currentDate = Date()
     @State private var activityData: ActivityProgress?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var showError = false
     
     var body: some View {
         VStack(spacing: 16) {
-            // Calories burned card
-            HealthCard(
-                title: "Calories burned",
-                value: String(format: "%.0f", activityData?.caloriesBurned ?? 0),
-                unit: "Kcal",
-                time: formattedTime(from: currentDate),
-                progress: (activityData?.caloriesBurned ?? 0) / 400 // Assuming goal = 400 Kcal
-            )
-            
-            // Workout minutes card
-            HealthCard(
-                title: "Workout Minutes",
-                value: String(activityData?.workoutMinutes ?? 0),
-                unit: "Mins"
-            )
-            
-            // Steps card with weekly data
-            HealthCard(
-                title: "Steps",
-                value: String(activityData?.totalSteps ?? 0),
-                unit: "Steps",
-                barValues: getWeeklySteps()
-            )
-            
-            // Body weight card
-            if let user = UserManager.shared.getAllUsers().first(where: { $0.id == UserId }) {
+            if isLoading {
+                ProgressView("Loading activity data...")
+            } else {
+                // Calories burned card
                 HealthCard(
-                    title: "Body Weight",
-                    value: String(format: "%.1f", user.weight),
-                    unit: "Kg",
-                    isButtonStyle: true
+                    title: "Calories burned",
+                    value: String(format: "%.0f", activityData?.caloriesBurned ?? 0),
+                    unit: "Kcal",
+                    time: formattedTime(from: currentDate),
+                    progress: (activityData?.caloriesBurned ?? 0) / 400 // Assuming goal = 400 Kcal
                 )
+                
+                // Workout minutes card
+                HealthCard(
+                    title: "Workout Minutes",
+                    value: String(activityData?.workoutMinutes ?? 0),
+                    unit: "Mins"
+                )
+                
+                // Steps card with weekly data
+                HealthCard(
+                    title: "Steps",
+                    value: String(activityData?.totalSteps ?? 0),
+                    unit: "Steps",
+                    barValues: getWeeklySteps()
+                )
+                
+                // Body weight card
+                if let user = UserManager.shared.getAllUsers().first(where: { $0.id == UserId }) {
+                    HealthCard(
+                        title: "Body Weight",
+                        value: String(format: "%.1f", user.weight),
+                        unit: "Kg",
+                        isButtonStyle: true
+                    )
+                }
             }
             
             Spacer()
@@ -46,12 +54,66 @@ struct HealthStatsView: View {
         .padding()
         .background(Color(.systemGray6))
         .onAppear {
-            loadActivityData()
+            requestHealthKitAuthorization()
+        }
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "An unknown error occurred")
         }
     }
     
-    private func loadActivityData() {
-        activityData = UserManager.shared.getActivity(for: currentDate)
+    private func requestHealthKitAuthorization() {
+        HealthKitManager.shared.requestAuthorization { success, error in
+            if success {
+                fetchActivityData()
+            } else {
+                errorMessage = error?.localizedDescription ?? "Failed to authorize HealthKit access"
+                showError = true
+                isLoading = false
+            }
+        }
+    }
+    
+    private func fetchActivityData() {
+        let group = DispatchGroup()
+        
+        group.enter()
+        HealthKitManager.shared.fetchSteps(for: currentDate) { fetchedSteps, error in
+            if let error = error {
+                errorMessage = error.localizedDescription
+                showError = true
+            } else {
+                activityData?.totalSteps = fetchedSteps
+            }
+            group.leave()
+        }
+        
+        group.enter()
+        HealthKitManager.shared.fetchCaloriesBurned(for: currentDate) { fetchedCalories, error in
+            if let error = error {
+                errorMessage = error.localizedDescription
+                showError = true
+            } else {
+                activityData?.caloriesBurned = fetchedCalories
+            }
+            group.leave()
+        }
+        
+        group.enter()
+        HealthKitManager.shared.fetchWorkoutMinutes(for: currentDate) { fetchedMinutes, error in
+            if let error = error {
+                errorMessage = error.localizedDescription
+                showError = true
+            } else {
+                activityData?.workoutMinutes = fetchedMinutes
+            }
+            group.leave()
+        }
+        
+        group.notify(queue: .main) {
+            isLoading = false
+        }
     }
     
     private func getWeeklySteps() -> [Double] {

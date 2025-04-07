@@ -5,6 +5,12 @@
 //  Created by Manav Gupta on 13/03/25.
 //
 
+
+
+
+
+
+
 import Foundation
 import SwiftUICore
 import SwiftUI
@@ -565,5 +571,79 @@ class UserManager : ObservableObject {
     private func loadDummyData() {
         // This function is kept for testing purposes but not called by default
         // You can call it manually when needed for testing
+    }
+
+    func calculateBMR(for user: User) -> Double {
+        let weight = user.weight
+        let height = user.height
+        let age = Double(user.age)  // Convert age to Double
+        
+        // Calculate base components
+        let weightComponent = 10 * weight
+        let heightComponent = 6.25 * height
+        let ageComponent = 5 * age
+        
+        // Calculate base BMR without gender adjustment
+        let baseBMR = weightComponent + heightComponent - ageComponent
+        
+        // Apply gender-specific adjustments
+        switch user.gender {
+        case .male:
+            return baseBMR + 5
+        case .female:
+            return baseBMR - 161
+        case .other:
+            // For other gender, use an average of male and female formulas
+            let maleBMR = baseBMR + 5
+            let femaleBMR = baseBMR - 161
+            return (maleBMR + femaleBMR) / 2
+        }
+    }
+    
+    func calculateTDEE(for user: User) -> Double {
+        let bmr = calculateBMR(for: user)
+        let activityFactor: Double
+        
+        switch user.activityLevel {
+        case .sedentary:
+            activityFactor = 1.2
+        case .active:
+            activityFactor = 1.375
+        case .moderateActive:
+            activityFactor = 1.55
+        case .veryActive:
+            activityFactor = 1.725
+        }
+        
+        return bmr * activityFactor
+    }
+    
+    func calculateMacronutrientGoals(for user: User) -> (carbs: Double, protein: Double, fats: Double, fiber: Double) {
+        let tdee = calculateTDEE(for: user)
+        
+        // Calculate macronutrient calories
+        let carbCalories = tdee * 0.5  // 50% carbs
+        let proteinCalories = tdee * 0.2  // 20% protein
+        let fatCalories = tdee * 0.3  // 30% fats
+        
+        // Convert calories to grams
+        // Carbs: 4 calories per gram
+        // Protein: 4 calories per gram
+        // Fats: 9 calories per gram
+        let carbs = carbCalories / 4
+        let protein = proteinCalories / 4
+        let fats = fatCalories / 9
+        
+        // Calculate fiber (g) = (TDEE / 1000) × 14
+        let fiber = (tdee / 1000) * 14
+        
+        return (carbs, protein, fats, fiber)
+    }
+    
+    func getMacronutrientGoals(for userId: String) -> (carbs: Double, protein: Double, fats: Double, fiber: Double)? {
+        guard let user = users.first(where: { $0.id == userId }) else {
+            return nil
+        }
+        return calculateMacronutrientGoals(for: user)
     }
 }
