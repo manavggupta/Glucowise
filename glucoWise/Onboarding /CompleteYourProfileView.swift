@@ -8,6 +8,7 @@ import SwiftUI
 import PhotosUI
 
 struct ProfileCompletionView: View {
+    @ObservedObject var userVM: UserViewModel
     @Environment(\.presentationMode) var presentationMode
     
     @State private var selectedImageData: Data? = nil
@@ -26,7 +27,7 @@ struct ProfileCompletionView: View {
     @State private var navigateToNextScreen = false
     
     private let themeColor = Color(hex: "6CAB9D")
-
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
@@ -115,7 +116,7 @@ struct ProfileCompletionView: View {
                 TextField("Height (cm)", text: $height)
                     .keyboardType(.numberPad)
                     .textFieldStyle(CustomTextFieldStyle())
-                  
+                
                 
                 // Weight TextField
                 TextField("Weight (kg)", text: $weight)
@@ -148,7 +149,7 @@ struct ProfileCompletionView: View {
                     .padding(.horizontal, 20)
                 }
                 
-                NavigationLink("", destination: ActivitySelectionView(), isActive: $navigateToNextScreen)
+                NavigationLink("", destination: ActivitySelectionView(userVM: userVM), isActive: $navigateToNextScreen)
             }
             .background(Color.white)
             .padding(.bottom, 10)
@@ -158,7 +159,6 @@ struct ProfileCompletionView: View {
         .tint(themeColor) // Add tint for navigation elements
     }
     
-    // MARK: - Validation Logic
     func validateAndProceed() {
         showValidationError = false
         validationErrorMessage = ""
@@ -188,22 +188,17 @@ struct ProfileCompletionView: View {
             return
         }
         
-        // Update user profile in UserManager
-        if let userIndex = UserManager.shared.getAllUsers().firstIndex(where: { $0.id == UserId }) {
-            var updatedUser = UserManager.shared.getAllUsers()[userIndex]
-            updatedUser.age = age
-            updatedUser.gender = Gender(rawValue: gender) ?? .male
-            updatedUser.height = heightValue
-            updatedUser.weight = weightValue
-            updatedUser.profileImageData = selectedImageData // Save the profile image data
-            UserManager.shared.updateUser(updatedUser)
-        }
+        // ✅ Update userVM values
+        userVM.age = age
+        userVM.gender = Gender(rawValue: gender) ?? .male
+        userVM.height = heightValue
+        userVM.weight = weightValue
+        userVM.profileImageData = selectedImageData
         
-        // If all validations pass, navigate to the next screen
+        // ✅ Navigate to next screen
         navigateToNextScreen = true
     }
 }
-
 // MARK: - Image Picker
 struct ImagePicker: UIViewControllerRepresentable {
     @Binding var imageData: Data?
@@ -262,6 +257,6 @@ extension View {
 
 struct ProfileCompletionView_Previews: PreviewProvider {
     static var previews: some View {
-        ProfileCompletionView()
+        ProfileCompletionView(userVM: UserViewModel())
     }
 }

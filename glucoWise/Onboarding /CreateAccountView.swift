@@ -1,6 +1,61 @@
 import SwiftUI
 
+
+import Foundation
+import SwiftUI
+
+class UserViewModel: ObservableObject {
+    @Published var id: String? = nil
+    @Published var name: String = ""
+    @Published var emailId: String = ""
+    @Published var password: String = ""
+    @Published var age: Int = 0
+    @Published var gender: Gender = .male
+    @Published var weight: Double = 0
+    @Published var goalWeight: Double = 0
+    @Published var height: Double = 0
+    @Published var targetBloodSugar: Double? = nil
+    @Published var currentBloodSugar: Double? = nil
+    @Published var goalHbA1c: Double = 0
+    @Published var goalActivityMinutes: Int = 0
+    @Published var activityLevel: String = "sedentary"
+    @Published var profileImageData: Data? = nil
+    func updateActivityLevel(_ level: ActivityLevel) {
+        self.activityLevel = level.rawValue
+    }
+
+
+    var toUserModel: User {
+        return User(
+            id: id, // Supabase will auto-generate or you can assign if needed
+            name: name,
+            emailId: emailId,
+            password: password,
+            age: age,
+            gender: gender,
+            weight: weight,
+            height: height,
+            targetBloodSugar: targetBloodSugar,
+            currentBloodSugar: currentBloodSugar,
+            activityLevel: ActivityLevel(rawValue: activityLevel) ?? .sedentary,
+            profileImageData: profileImageData
+        )
+    }
+    func updateGoals(weight: Double, bloodSugar: Double, hba1c: Double, activityMinutes: Int) {
+        self.goalWeight = weight
+        self.targetBloodSugar = bloodSugar
+        self.goalHbA1c = hba1c
+        self.goalActivityMinutes = activityMinutes
+    }
+
+}
+
+
+
+
+
 struct RegistrationView: View {
+    @ObservedObject var uservm : UserViewModel
     @State private var name: String = ""
     @State private var email: String = ""
     @State private var password: String = ""
@@ -107,21 +162,9 @@ struct RegistrationView: View {
                     
                     // Register button (enabled only if all validations pass)
                     Button(action: {
-                        // Create and save user object
-                        let newUser = User(
-                            name: name,
-                            emailId: email,
-                            password: password,
-                            age: 0, // Will be updated in ProfileCompletionView
-                            gender: .male, // Will be updated in ProfileCompletionView
-                            weight: 0, // Will be updated in ProfileCompletionView
-                            height: 0, // Will be updated in ProfileCompletionView
-                            targetBloodSugar: nil, // Will be updated later
-                            currentBloodSugar: nil, // Will be updated later
-                            activityLevel: .sedentary // Will be updated in ActivitySelectionView
-                        )
-                        UserManager.shared.addUser(newUser)
-                        UserId = newUser.id! // Set the global UserId to the new user's ID
+                        uservm.name = name
+                            uservm.emailId = email
+                            uservm.password = password
                         navigateToProfileCompletion = true
                     }) {
                         Text("Register")
@@ -150,7 +193,7 @@ struct RegistrationView: View {
                 LoginView()
             }
             .navigationDestination(isPresented: $navigateToProfileCompletion) {
-                ProfileCompletionView()
+                ProfileCompletionView(userVM: uservm)
             }
         }
     }
@@ -174,6 +217,6 @@ struct RegistrationView: View {
 
 struct RegistrationView_Previews: PreviewProvider {
     static var previews: some View {
-        RegistrationView()
+        RegistrationView(uservm: UserViewModel())
     }
 }

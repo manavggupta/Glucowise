@@ -109,7 +109,7 @@ struct LoginView: View {
             ContentView()
         }
         .fullScreenCover(isPresented: $navigateToRegister) {
-            RegistrationView()
+            RegistrationView(uservm: UserViewModel())
         }
     }
     
@@ -121,14 +121,46 @@ struct LoginView: View {
     
     // ✅ Login Validation Function
     private func handleLogin() {
-        let users = UserManager.shared.getAllUsers()
-        
-        if let user = users.first(where: { $0.emailId == email && $0.password == password }) {
-            UserDefaults.standard.set(user.id, forKey: "currentUserId") // Save UserId to UserDefaults
-            isLoggedIn = true  // Navigate to ContentView
-        } else {
-            alertMessage = "Invalid email or password. Please try again."
-            showAlert = true
+        Task {
+            do {
+                let session = try await SupabaseManager.shared.client.auth.signIn(
+                    email: email,
+                    password: password
+                )
+
+                print("✅ Login successful! Session: \(session)")
+
+                guard let userId = session.user.id.uuidString as String? else {
+                    alertMessage = "User ID not found."
+                    showAlert = true
+                    return
+                }
+
+                // Fetch user data from "users" table using auth ID
+                let user: User = try await SupabaseManager.shared.client.database
+                    .from("users")
+                    .select()
+                    .eq("id", value: userId)
+                    .single()
+                    .execute()
+                    .value
+
+                print("✅ Fetched user: \(user.name)")
+
+                // ✅ Optionally: Load data into shared view model here if needed
+                // For example:
+                // userVM.load(from: user)
+
+                isLoggedIn = true
+
+            } catch {
+                print("❌ Login failed: \(error)")
+                alertMessage = "Invalid email or password. Please try again."
+                showAlert = true
+            }
         }
     }
+
+
+
 }

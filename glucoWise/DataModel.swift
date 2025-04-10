@@ -14,9 +14,18 @@
 import Foundation
 import SwiftUICore
 import SwiftUI
+import Supabase
+
+
+let supabase = SupabaseClient(
+    supabaseURL: URL(string: "https://cbcmbvlinobknzpyfnry.supabase.co")!,
+    supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNiY21idmxpbm9ia256cHlmbnJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQxNzcxOTcsImV4cCI6MjA1OTc1MzE5N30._SL5VSc17L6eSFM5t4SZ6UzoCZNRyqrRQWlGr22VXqI"
+)
+
+
 
 struct User: Codable {
-    var id: String? = UUID().uuidString
+    var id: String? = nil
     var name: String
     var emailId: String
     var password: String
@@ -25,9 +34,19 @@ struct User: Codable {
     var weight: Double
     var height: Double
     var targetBloodSugar: Double?
+    var goalWeight : Double?
+    var goalHbA1c : Double?
+    var goalActivityMinutes : Int?
     var currentBloodSugar: Double?
     var activityLevel: ActivityLevel
     var profileImageData: Data?
+    enum CodingKeys: String, CodingKey {
+            case id, name, password, age, gender, weight, height
+            case  currentBloodSugar, profileImageData
+            case activityLevel = "activitylevel"
+        case emailId = "emailid"// 🔥 Mapped to match Supabase columnc
+        case targetBloodSugar = "targetbloodsugar"
+        }
 }
 struct Tip {
     let imageName: String

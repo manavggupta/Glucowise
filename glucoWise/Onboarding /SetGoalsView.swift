@@ -2,17 +2,22 @@ import SwiftUI
 
 struct GoalsSetupView: View {
     @Environment(\.dismiss) private var dismiss
-    
+    @ObservedObject var userVM: UserViewModel
     @State private var weightGoal: String = "0"
     @State private var bloodGlucoseGoal: String = "0"
     @State private var hba1cGoal: String = "0"
     @State private var activityGoal: String = "0"
+    @State private var navigateToBloodInput = false
     
-    // Custom accent color
     private let accentColor = Color(red: 108/255, green: 171/255, blue: 157/255)
     
     var body: some View {
         VStack(spacing: 20) {
+            // Navigation trigger (hidden)
+            NavigationLink(destination: BloodSugarInputView(), isActive: $navigateToBloodInput) {
+                EmptyView()
+            }
+
             // Goal Items
             goalItem(
                 icon: "scalemass.fill",
@@ -48,17 +53,63 @@ struct GoalsSetupView: View {
             
             Spacer()
         }
-        .padding(.top,20)
+        .padding(.top, 20)
         .navigationTitle("Set Goals")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarItems(trailing: Button("Done") {
-            dismiss()
+            saveUserAndNavigate()
         })
     }
     
+    private func saveUserAndNavigate() {
+        if let weight = Double(weightGoal),
+           let bloodSugar = Double(bloodGlucoseGoal),
+           let hba1c = Double(hba1cGoal),
+           let activity = Int(activityGoal) {
+
+            userVM.updateGoals(
+                weight: weight,
+                bloodSugar: bloodSugar,
+                hba1c: hba1c,
+                activityMinutes: activity
+            )
+
+            Task {
+                do {
+                    // 1. ✅ Sign up user in Supabase Auth
+                    let authResponse = try await SupabaseManager.shared.client.auth.signUp(
+                        email: userVM.emailId,
+                        password: userVM.password
+                    )
+
+                    // 2. ✅ Get UID from auth
+                    let uid = authResponse.user.id.uuidString
+
+
+                    userVM.id = uid // Set ID
+
+                    // 3. ✅ Create the user in your custom 'users' table
+                    let user = userVM.toUserModel
+
+                    try await SupabaseManager.shared.client.database
+                        .from("users")
+                        .insert([user])
+                        .execute()
+
+                    print("✅ User registered and saved in DB!")
+                    navigateToBloodInput = true
+                } catch {
+                    print("❌ Error: \(error)")
+                }
+            }
+
+
+        }
+    }
+
+    
     private func goalItem(icon: String, title: String, subtitle: String, value: Binding<String>, isDecimal: Bool) -> some View {
         HStack(spacing: 15) {
-            // Icon
             ZStack {
                 Circle()
                     .fill(accentColor)
@@ -69,7 +120,6 @@ struct GoalsSetupView: View {
                     .foregroundColor(.white)
             }
             
-            // Text
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.system(size: 18, weight: .semibold))
@@ -85,10 +135,7 @@ struct GoalsSetupView: View {
             
             Spacer()
             
-            // Value Control
             HStack(spacing: 10) {
-            
-                
                 TextField("", text: value)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.center)
@@ -101,7 +148,6 @@ struct GoalsSetupView: View {
                     .onChange(of: value.wrappedValue) { newValue in
                         value.wrappedValue = filterNumericInput(newValue, isDecimal: isDecimal)
                     }
-                
             }
             .frame(width: 100)
         }
@@ -120,7 +166,7 @@ struct GoalsSetupView: View {
 struct GoalsSetupView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationView {
-            GoalsSetupView()
+            GoalsSetupView(userVM: UserViewModel())
         }
     }
 }

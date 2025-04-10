@@ -1,22 +1,24 @@
 import SwiftUI
 
+
+
 struct ActivitySelectionView: View {
-    // Initialize with a default selected activity
+    @ObservedObject var userVM: UserViewModel
     @State private var selectedActivity: String? = "sedentary"
     @Environment(\.presentationMode) var presentationMode
-    
+
     let activities = [
         Activity(id: "sedentary", title: "Sedentary", description: "Very little or no physical activity", icon: "chair.fill"),
         Activity(id: "lightly", title: "Lightly Active", description: "Occasional physical activity, such as light walking or household chores.", icon: "figure.stand"),
         Activity(id: "moderately", title: "Moderately Active", description: "Regular physical activity, such as walking, jogging, or exercise 2-3 times a week.", icon: "figure.walk"),
         Activity(id: "very", title: "Very Active", description: "Frequent, intense activity or regular workouts 4+ times a week.", icon: "figure.outdoor.cycle")
     ]
-    
+
     private let columns = [
         GridItem(.flexible()),
         GridItem(.flexible())
     ]
-    
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
@@ -24,7 +26,7 @@ struct ActivitySelectionView: View {
                     .font(.title)
                     .fontWeight(.bold)
                     .padding(.bottom, 16)
-                
+
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(activities) { activity in
@@ -40,12 +42,12 @@ struct ActivitySelectionView: View {
                     .padding(.horizontal)
                     .padding(.top, 20)
                 }
-                
+
                 Spacer()
-                
+
                 HStack {
                     Spacer()
-                    NavigationLink(destination: BloodSugarInputView()) {
+                    NavigationLink(destination: GoalsSetupView(userVM: userVM)) {
                         Text("Next")
                             .foregroundColor(.white)
                             .fontWeight(.medium)
@@ -57,12 +59,7 @@ struct ActivitySelectionView: View {
                     .disabled(selectedActivity == nil)
                     .onTapGesture {
                         if let activity = selectedActivity {
-                            // Update user's activity level in UserManager
-                            if let userIndex = UserManager.shared.getAllUsers().firstIndex(where: { $0.id == UserId }) {
-                                var updatedUser = UserManager.shared.getAllUsers()[userIndex]
-                                updatedUser.activityLevel = ActivityLevel(rawValue: activity) ?? .sedentary
-                                UserManager.shared.updateUser(updatedUser)
-                            }
+                            userVM.updateActivityLevel(ActivityLevel(rawValue: activity) ?? .sedentary)
                         }
                     }
                     Spacer()
@@ -75,6 +72,8 @@ struct ActivitySelectionView: View {
         }
     }
 }
+
+
 
 struct Activity: Identifiable {
     var id: String
@@ -137,6 +136,6 @@ struct ActivityCardView: View {
 
 struct ContentViews_Previews: PreviewProvider {
     static var previews: some View {
-        ActivitySelectionView()
+        ActivitySelectionView(userVM: UserViewModel())
     }
 }
