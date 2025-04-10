@@ -130,26 +130,9 @@ struct LoginView: View {
 
                 print("✅ Login successful! Session: \(session)")
 
-                guard let userId = session.user.id.uuidString as String? else {
-                    alertMessage = "User ID not found."
-                    showAlert = true
-                    return
-                }
-
-                // Fetch user data from "users" table using auth ID
-                let user: User = try await SupabaseManager.shared.client.database
-                    .from("users")
-                    .select()
-                    .eq("id", value: userId)
-                    .single()
-                    .execute()
-                    .value
-
-                print("✅ Fetched user: \(user.name)")
-
-                // ✅ Optionally: Load data into shared view model here if needed
-                // For example:
-                // userVM.load(from: user)
+                let userId = session.user.id.uuidString
+                UserDefaults.standard.set(userId, forKey: "currentUserId")
+                print("✅ User ID saved: \(userId)")
 
                 isLoggedIn = true
 
@@ -160,6 +143,7 @@ struct LoginView: View {
             }
         }
     }
+
 
 
 

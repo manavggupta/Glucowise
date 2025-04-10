@@ -194,6 +194,56 @@ struct BloodReading: Codable, Identifiable {
         self.value = value
         self.date = date
     }
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        self.id = try container.decode(String.self, forKey: .id)
+        self.userId = try? container.decode(String.self, forKey: .userId)
+        self.type = try container.decode(BloodReadingType.self, forKey: .type)
+        self.value = try container.decode(Double.self, forKey: .value)
+
+        let dateString = try container.decode(String.self, forKey: .date)
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss" // Matches "2025-04-10T06:54:24"
+        formatter.timeZone = TimeZone(secondsFromGMT: 0) // or use .current if needed
+
+        guard let parsedDate = formatter.date(from: dateString) else {
+            throw DecodingError.dataCorruptedError(forKey: .date,
+                                                   in: container,
+                                                   debugDescription: "Invalid date format: \(dateString)")
+        }
+        self.date = parsedDate
+    }
+
+}
+extension BloodReading {
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case type
+        case value
+        case date
+    }
+
+    func toSupabaseFormat() -> EncodableBloodReading {
+        let isoDate = ISO8601DateFormatter().string(from: date)
+        return EncodableBloodReading(
+            id: id,
+            user_id: userId ?? "",
+            type: type.rawValue,
+            value: value,
+            date: isoDate
+        )
+    }
+
+    struct EncodableBloodReading: Encodable {
+        var id: String
+        var user_id: String
+        var type: String
+        var value: Double
+        var date: String
+    }
 }
 
 
@@ -216,7 +266,13 @@ enum MealType: String, Codable {
 var UserId: String = UserDefaults.standard.string(forKey: "currentUserId") ?? ""
 
 class UserManager : ObservableObject {
+    
+    private let client = SupabaseClient(
+           supabaseURL: URL(string: "https://cbcmbvlinobknzpyfnry.supabase.co")!,
+           supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNiY21idmxpbm9ia256cHlmbnJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQxNzcxOTcsImV4cCI6MjA1OTc1MzE5N30._SL5VSc17L6eSFM5t4SZ6UzoCZNRyqrRQWlGr22VXqI"
+       )
     static let shared = UserManager()
+    
 
     var users: [User] = []
     private var recommendedMeals: [String: [Date: [Meal]]] = [:]
@@ -502,37 +558,61 @@ class UserManager : ObservableObject {
 
     // Function to add a reading
     func addBloodReading(_ reading: BloodReading, for userId: String) {
-        let currentDate = Date()
-        let dateKey = formatDate(reading.date)
+        Task {
+            do {
+                var readingWithUserId = reading
+                readingWithUserId.userId = userId
 
-        // Ensure the reading date is not in the future
-        guard reading.date <= currentDate else {
-            print("Error: Cannot add a future blood reading.")
-            return
+                let supabaseReady = readingWithUserId.toSupabaseFormat()
+                
+                try await client
+                    .from("blood_readings")
+                    .insert(supabaseReady)
+                    .execute()
+                
+                print("Reading saved to Supabase ✅")
+            } catch {
+                print("Failed to save reading to Supabase ❌: \(error.localizedDescription)")
+            }
         }
-
-        // Ensure there is a dictionary for the user
-        if readingsByDate[userId] == nil {
-            readingsByDate[userId] = [:]
-        }
-
-        // Ensure there is an array for the date key
-        if readingsByDate[userId]?[dateKey] == nil {
-            readingsByDate[userId]?[dateKey] = []
-        }
-
-        // Append the reading
-        readingsByDate[userId]?[dateKey]?.append(reading)
-        print("Added reading: \(reading.value) for \(userId) on \(dateKey)")
-        
     }
+
 
 
     // Function to get readings for a specific date
     func getReadings(for date: Date, userId: String) -> [BloodReading] {
-        let dateKey = formatDate(date)
-        return (readingsByDate[userId]?[dateKey] ?? []).sorted { $0.date > $1.date }
+        var fetchedReadings: [BloodReading] = []
+        let semaphore = DispatchSemaphore(value: 0)
+
+        Task {
+            do {
+                let response: PostgrestResponse<[BloodReading]> = try await client
+                    .from("blood_readings")
+                    .select()
+                    .eq("user_id", value: userId)
+                    .execute()
+
+                let allReadings = response.value ?? []
+
+                let filtered = allReadings.filter {
+                    Calendar.current.isDate($0.date, inSameDayAs: date)
+                }
+
+                fetchedReadings = filtered
+            } catch {
+                print("❌ Failed to fetch or decode readings: \(error)")
+            }
+
+            semaphore.signal()
+        }
+
+        semaphore.wait()
+        return fetchedReadings
     }
+
+
+
+
 
 
     private func formatDate(_ date: Date) -> String {

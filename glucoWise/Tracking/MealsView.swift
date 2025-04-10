@@ -9,6 +9,8 @@ struct MealsView: View {
     @State private var selectedMealType: String? = nil
     @AppStorage("currentUserId") var userId: String = ""
     @ObservedObject var userManager = UserManager.shared
+    
+    
     var currentWeek: [Date] {
         let calendar = Calendar(identifier: .iso8601)
         let today = Date()
@@ -16,6 +18,7 @@ struct MealsView: View {
         
         return (0..<7).compactMap { calendar.date(byAdding: .day, value: -$0, to: Date()) }.reversed()
     }
+    
 
     var body: some View {
   

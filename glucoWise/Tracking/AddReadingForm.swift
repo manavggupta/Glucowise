@@ -59,6 +59,12 @@ struct AddReadingView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
+                        if userId.isEmpty {
+                            alertMessage = "User ID is missing. Please log in again."
+                            showAlert = true
+                            return
+                        }
+
                         if let value = Int(bloodSugarReading) {
                             if value > 600 {
                                 alertMessage = "Reading cannot exceed 600 mg/dL"
@@ -70,6 +76,7 @@ struct AddReadingView: View {
                                 showAlert = true
                                 return
                             }
+
                             let newReading = BloodReading(type: selectedTag, value: Double(value), date: selectedTime)
                             UserManager.shared.addBloodReading(newReading, for: userId)
                             onSave()
@@ -79,6 +86,7 @@ struct AddReadingView: View {
                             showAlert = true
                         }
                     }
+
                 }
             }
             .alert("Invalid Input", isPresented: $showAlert) {
