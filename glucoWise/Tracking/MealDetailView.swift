@@ -114,58 +114,54 @@ struct NutrientRows: View {
     let mealType: String
     @AppStorage("currentUserId") var userId: String = ""
     
-    var total: Int {
-        if let goals = UserManager.shared.getMacronutrientGoals(for: userId) {
-            let mealPercentage: Double
-            switch mealType {
-            case "Breakfast":
-                mealPercentage = 0.25
-            case "Lunch":
-                mealPercentage = 0.35
-            case "Snacks":
-                mealPercentage = 0.15
-            case "Dinner":
-                mealPercentage = 0.25
-            default:
-                mealPercentage = 0.0
-            }
-            
-            switch name {
-            case "Carbs":
-                return Int(goals.carbs * mealPercentage)
-            case "Protein":
-                return Int(goals.protein * mealPercentage)
-            case "Fats":
-                return Int(goals.fats * mealPercentage)
-            case "Fiber":
-                return Int(goals.fiber * mealPercentage)
-            default:
-                return 0
-            }
-        }
-        return 0
-    }
-    
-    var color: Color {
-        let ratio = Double(current) / Double(total)
-        if ratio > 1.0 { return .red }
-        else if ratio >= 0.8 { return .green }
-        else { return .orange }
-    }
+    @State private var totalGoal: Int = 0
     
     var body: some View {
         HStack {
             Text(name)
             Spacer()
-            Text("\(current)/\(total) g")
+            Text("\(current)/\(totalGoal) g")
                 .font(.subheadline)
                 .foregroundColor(.gray)
-            ProgressView(value: Double(current), total: Double(total))
+            ProgressView(value: Double(current), total: Double(max(1, totalGoal))) // Avoid zero division
                 .progressViewStyle(LinearProgressViewStyle(tint: color))
                 .frame(width: 100)
         }
+        .onAppear {
+            Task {
+                if let goals = await UserManager.shared.getMacronutrientGoals(for: userId) {
+                    let mealPercentage: Double
+                    switch mealType {
+                    case "Breakfast": mealPercentage = 0.25
+                    case "Lunch": mealPercentage = 0.35
+                    case "Snacks": mealPercentage = 0.15
+                    case "Dinner": mealPercentage = 0.25
+                    default: mealPercentage = 0.0
+                    }
+                    
+                    let total: Double
+                    switch name {
+                    case "Carbs": total = goals.carbs
+                    case "Protein": total = goals.protein
+                    case "Fats": total = goals.fats
+                    case "Fiber": total = goals.fiber
+                    default: total = 0
+                    }
+                    
+                    totalGoal = Int(total * mealPercentage)
+                }
+            }
+        }
+    }
+    
+    var color: Color {
+        let ratio = Double(current) / Double(max(1, totalGoal)) // avoid divide-by-zero
+        if ratio > 1.0 { return .red }
+        else if ratio >= 0.8 { return .green }
+        else { return .orange }
     }
 }
+
 
 struct MealDetailView_Previews: PreviewProvider {
     static var previews: some View {

@@ -592,7 +592,7 @@ class UserManager : ObservableObject {
                     .eq("user_id", value: userId)
                     .execute()
 
-                let allReadings = response.value ?? []
+                let allReadings = response.value
 
                 let filtered = allReadings.filter {
                     Calendar.current.isDate($0.date, inSameDayAs: date)
@@ -675,30 +675,25 @@ class UserManager : ObservableObject {
     func calculateBMR(for user: User) -> Double {
         let weight = user.weight
         let height = user.height
-        let age = Double(user.age)  // Convert age to Double
+        let age = Double(user.age)
         
-        // Calculate base components
         let weightComponent = 10 * weight
         let heightComponent = 6.25 * height
         let ageComponent = 5 * age
-        
-        // Calculate base BMR without gender adjustment
         let baseBMR = weightComponent + heightComponent - ageComponent
         
-        // Apply gender-specific adjustments
         switch user.gender {
         case .male:
             return baseBMR + 5
         case .female:
             return baseBMR - 161
         case .other:
-            // For other gender, use an average of male and female formulas
             let maleBMR = baseBMR + 5
             let femaleBMR = baseBMR - 161
             return (maleBMR + femaleBMR) / 2
         }
     }
-    
+
     func calculateTDEE(for user: User) -> Double {
         let bmr = calculateBMR(for: user)
         let activityFactor: Double
@@ -716,33 +711,31 @@ class UserManager : ObservableObject {
         
         return bmr * activityFactor
     }
-    
+
     func calculateMacronutrientGoals(for user: User) -> (carbs: Double, protein: Double, fats: Double, fiber: Double) {
         let tdee = calculateTDEE(for: user)
         
-        // Calculate macronutrient calories
-        let carbCalories = tdee * 0.5  // 50% carbs
-        let proteinCalories = tdee * 0.2  // 20% protein
-        let fatCalories = tdee * 0.3  // 30% fats
+        let carbCalories = tdee * 0.5
+        let proteinCalories = tdee * 0.2
+        let fatCalories = tdee * 0.3
         
-        // Convert calories to grams
-        // Carbs: 4 calories per gram
-        // Protein: 4 calories per gram
-        // Fats: 9 calories per gram
         let carbs = carbCalories / 4
         let protein = proteinCalories / 4
         let fats = fatCalories / 9
-        
-        // Calculate fiber (g) = (TDEE / 1000) × 14
         let fiber = (tdee / 1000) * 14
         
         return (carbs, protein, fats, fiber)
     }
-    
-    func getMacronutrientGoals(for userId: String) -> (carbs: Double, protein: Double, fats: Double, fiber: Double)? {
-        guard let user = users.first(where: { $0.id == userId }) else {
+    func getMacronutrientGoals(for userId: String) async -> (carbs: Double, protein: Double, fats: Double, fiber: Double)? {
+        do {
+            let user = try await SupabaseManager.shared.fetchUser(withId: userId)
+            return calculateMacronutrientGoals(for: user)
+        } catch {
+            print("Failed to fetch user: \(error)")
             return nil
         }
-        return calculateMacronutrientGoals(for: user)
     }
+
+
+
 }
